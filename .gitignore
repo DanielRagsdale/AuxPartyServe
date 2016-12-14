@@ -1,0 +1,4 @@
+db.sqlite3
+aws_connect
+aws_push
+*/settings.py
