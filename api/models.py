@@ -6,6 +6,8 @@ import datetime
 # Create your models here.
 class Song(models.Model):
     title = models.CharField(max_length=250)
+    artist = models.CharField(max_length=250)
+
     apple_id = models.CharField(max_length=250)
 
     def __str__(self):
@@ -38,6 +40,13 @@ class SongRequest(models.Model):
     is_fulfilled = models.BooleanField(default=False)
 
     request_time = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.song.title + self.session.identifier
+
+class SongCandidate(models.Model):
+    session = models.ForeignKey(Session, related_name='candidate_session', on_delete=models.CASCADE)
+    song = models.ForeignKey(Song, related_name='candidate_songs', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.song.title + self.session.identifier
