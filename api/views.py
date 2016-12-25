@@ -8,6 +8,8 @@ from .models import Song, Session, SessionSong, SongRequest, SongCandidate
 from .serializers import SessionSerializer, SessionSongSerializer
 from .tasks import gen_candidate_songs, create_request_from_apple 
 
+import operator
+
 # Create your views here.
 def index(request):
     return HttpResponse("<h1>Hello World</h1>")
@@ -15,18 +17,21 @@ def index(request):
 class SessionSongList(APIView):
 
     def get(self, request, identifier):
-        
         session = Session.objects.get(identifier=identifier)
-       
-        if SessionSong.objects.filter(session=session).count() < int(request.GET.get('count')) - 1:
-            # Start asynchronously generating candidate songs
+
+        requested_count = int(request.GET.get('count'))
+        true_count = SessionSong.objects.filter(session=session).count()
+
+        # Start asynchronously generating candidate songs
+        if true_count < requested_count - 1:
             gen_candidate_songs.delay(identifier)
         
-        if SessionSong.objects.filter(session=session).count() < int(request.GET.get('count')):
-            print('Less Than')
-            finalizeCandidates(identifier, 1)
-            # Add new songs until the playlist length is equal to count
-    
+        # Add new songs until the playlist length is equal to count
+        if true_count < requested_count:
+            print(requested_count - true_count)
+            finalizeCandidates(identifier, requested_count - true_count)
+            session = Session.objects.get(identifier=identifier)
+
         serializer = SessionSerializer(session)
 
         return Response(serializer.data)
@@ -56,26 +61,30 @@ class SessionSongList(APIView):
         return Response("success", status=status.HTTP_201_CREATED)
 
 def finalizeCandidates(identifier, needed_count):
-    candidates = SongCandidate.objects.filter(session=Session.objects.get(identifier=identifier))
+    session = Session.objects.get(identifier=identifier)
+    
+    candidates = SongCandidate.objects.filter(session=session)
 
-    print(candidates)
+    grouped_candidates = {} 
 
     for r in candidates:
-        addRequest(r)
-        r.delete()
+        if r.song not in grouped_candidates:
+            grouped_candidates[r.song] = 1
+        else:
+            grouped_candidates[r.song] += 1 
+        
+    for i in range(needed_count):
+        if grouped_candidates:
+            max_request = max(grouped_candidates.iteritems(), key=operator.itemgetter(1))[0]
 
-def addRequest(request):
+            addRequest(max_request, session)
+
+            SongCandidate.objects.filter(session=session, song=max_request).delete() 
+
+def addRequest(song, session):
     session_song = SessionSong()
 
-    session_song.session = request.session
-    session_song.song = request.song
+    session_song.session = session
+    session_song.song = song
 
     session_song.save()
-
-
-
-
-
-
-
-

@@ -7,19 +7,21 @@ import requests
 def gen_candidate_songs(session_identifier):
     session = Session.objects.get(identifier=session_identifier)
 
-    candidate = SongCandidate()
+    requested = SongRequest.objects.filter(session=session, is_fulfilled=False)
 
-    first_requested = SongRequest.objects.filter(session=session, is_fulfilled=False).first()
-
-    if first_requested is None:
+    # Add fallback candidates if there have been no song requests
+    if requested is None:
         return False
 
-    candidate.session = session
-    candidate.song = first_requested.song
-    candidate.save()
+    for r in requested:
+        candidate = SongCandidate()
 
-    first_requested.is_fulfilled = True
-    first_requested.save()
+        candidate.session = session
+        candidate.song = r.song
+        candidate.save()
+
+        r.is_fulfilled = True
+        r.save()
 
     return True 
    
@@ -30,9 +32,6 @@ def create_request_from_apple(apple_id, session_identifier):
     session = Session.objects.get(identifier=session_identifier)
 
     song = Song()
-
-    print(r.json())
-    print('*************')
 
     results = r.json().get('results')
     if len(results) > 0:
