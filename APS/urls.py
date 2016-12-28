@@ -20,7 +20,9 @@ from api import views
 
 urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^api/(?P<identifier>[\w]+)', views.SessionSongList.as_view()),
+    url(r'^api/name/(?P<identifier>[\w]+)', views.getName, name='get_name'),
+    url(r'^api/create$', views.SessionCreate.as_view()),
+    url(r'^api/data/(?P<identifier>[\w]+)', views.SessionSongList.as_view()),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns, allowed=['json', 'html'])

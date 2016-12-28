@@ -14,7 +14,7 @@ if len(results) > 0:
 
     payload = {'apple_id': str(apple_id)}
 
-    p = requests.post('http://localhost:8000/api/00000', data=payload)
+    p = requests.post('http://localhost:8000/api/data/00000', data=payload)
 
     print(p.text)
 

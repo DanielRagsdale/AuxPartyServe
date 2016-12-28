@@ -21,4 +21,10 @@ class SessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ('identifier', 'tracks')
+        fields = ('user_name', 'identifier', 'tracks')
+
+class SessionNameSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Session
+        fields = ('user_name', 'identifier')

@@ -28,6 +28,8 @@ def gen_candidate_songs(session_identifier):
 @shared_task
 def create_request_from_apple(apple_id, session_identifier):
     r = requests.get('https://itunes.apple.com/lookup', params={'id':apple_id})
+   
+    print(r.json())
     
     session = Session.objects.get(identifier=session_identifier)
 

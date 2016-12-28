@@ -3,3 +3,4 @@ aws_connect
 aws_push
 */settings.py
 **/*.pyc
+**/*.swp
