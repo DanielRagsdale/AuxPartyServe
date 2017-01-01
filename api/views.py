@@ -20,12 +20,94 @@ def index(request):
 
 def getName(request, identifier):
     identifier = identifier.upper()
-    session = Session.objects.get(identifier=identifier) 
-    serializer = SessionNameSerializer(session)
     
-    json = JSONRenderer().render(serializer.data)
+    session = Session.objects.filter(identifier=identifier).first()
+
+    if session is None:
+        return HttpResponse("{ \"does_exist\":false } ")
+
+    json = JSONRenderer().render({"does_exist":True, "user_name":session.user_name, "identifier":identifier })
 
     return HttpResponse(json) 
+
+class NeutralPlaying(APIView):
+
+    def get(self, request, identifier):
+        session = Session.objects.get(identifier=identifier)
+        song = session.now_playing
+
+        return Response({"apple_id":song.apple_id, "is_closed":session.is_closed})
+
+    def post(self, request, identifier):
+        identifier = identifier.upper()
+
+        session = Session.objects.get(identifier=identifier)
+
+        now_playing = Song.objects.get(apple_id=request.data.get("apple_id"))
+        session.now_playing = now_playing
+
+        session.save()
+
+        return Response("playing song set")
+
+class ClientRequest(APIView):
+    
+    def get(self, request, identifier):
+        return Response("POST to request song")
+
+    def post(self, request, identifier):
+        identifier = identifier.upper()
+
+        apple_id = request.data.get('apple_id')
+        session = Session.objects.get(identifier=identifier)
+        song = Song.objects.filter(apple_id=apple_id).first()
+
+        if session.is_closed:
+            return Response("Session is Closed", status=status.HTTP_200_OK)
+
+        if song is None:
+            # Add a song from an itunes lookup
+            create_request_from_apple.delay(apple_id, identifier)
+            print('song is not found')
+
+            return Response("delayed creation", status=status.HTTP_201_CREATED)
+        
+        # Add a SongRequest object to later be considered by the AI
+
+        song_request = SongRequest()
+        song_request.session = session 
+        song_request.song = song 
+        
+        song_request.save()
+        
+        # Depending upon some set of parameters, flag a song for re-analysis
+
+        return Response("success", status=status.HTTP_201_CREATED)
+
+
+class HostClose(APIView):
+    
+    def get(self, request, identifier):
+        identifier = identifier.upper()
+        session = Session.objects.get(identifier=identifier)
+
+        if session.is_closed:
+            return Response({'status':'closed'})
+        else:
+            return Response({'status':'open'})
+
+    def post(self, request, identifier):
+        identifier = identifier.upper()
+        session = Session.objects.get(identifier=identifier)
+
+
+        if request.data.get('key') == toKey(identifier):
+            session.is_closed = True
+            session.save()
+        else:
+            return Response("You do not have permission to close this session", status=status.HTTP_403_FORBIDDEN)
+
+        return Response("Feature closed")
 
 class SessionCreate(APIView):
     
@@ -41,7 +123,9 @@ class SessionCreate(APIView):
         while not identifier:
             identifier =  tryCreateSession(user_name)
 
-        return Response({'identifier': identifier})
+        return Response({
+            'identifier': identifier,
+            'key': toKey(identifier)})
 
 class SessionSongList(APIView):
 
@@ -68,32 +152,16 @@ class SessionSongList(APIView):
         return Response(serializer.data)
 
     def post(self, request, identifier):
-        identifier = identifier.upper()
-
-        apple_id = request.data.get('apple_id')
-
-        song = Song.objects.filter(apple_id=apple_id).first()
-
-        if song is None:
-            # Add a song from an itunes lookup
-            create_request_from_apple.delay(apple_id, identifier)
-            print('song is not found')
-
-            return Response("delayed creation", status=status.HTTP_201_CREATED)
-        
-        # Add a SongRequest object to later be considered by the AI
-
-        song_request = SongRequest()
-        song_request.session = Session.objects.get(identifier=identifier)
-        song_request.song = song 
-        
-        song_request.save()
-        
-        # Depending upon some set of parameters, flag a song for re-analysis
-
-        return Response("success", status=status.HTTP_201_CREATED)
+        return Response("GET to receive playlist")
 
 # Helper functions
+
+def toKey(identifier):
+    key = ''
+    for c in identifier:
+        key += str(ord(c))
+    
+    return key
 
 def generateID(size=5, chars=string.ascii_uppercase):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -123,7 +191,7 @@ def finalizeCandidates(identifier, needed_count):
             grouped_candidates[r.song] = 1
         else:
             grouped_candidates[r.song] += 1 
-        
+       
     if grouped_candidates:
         max_request = max(grouped_candidates.iteritems(), key=operator.itemgetter(1))[0]
 

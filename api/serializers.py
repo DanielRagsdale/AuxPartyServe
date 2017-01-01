@@ -25,6 +25,8 @@ class SessionSerializer(serializers.ModelSerializer):
 
 class SessionNameSerializer(serializers.ModelSerializer):
     
+    does_exist = True
+
     class Meta:
         model = Session
-        fields = ('user_name', 'identifier')
+        fields = ('user_name', 'identifier', 'does_exist')

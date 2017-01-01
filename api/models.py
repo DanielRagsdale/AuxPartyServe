@@ -17,6 +17,9 @@ class Session(models.Model):
     create_date = models.DateTimeField(auto_now_add=True) 
     identifier = models.CharField(unique=True, max_length=5)
     user_name = models.CharField(max_length=250)
+    
+    now_playing = models.ForeignKey(Song, null=True, blank=True, on_delete=models.SET_NULL)
+    is_closed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.identifier
