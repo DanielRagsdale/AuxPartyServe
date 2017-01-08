@@ -12,7 +12,7 @@ urlpatterns = [
     url(r'host/create$', views.SessionCreate.as_view()),
     url(r'host/data/(?P<identifier>[\w]+)', views.SessionSongList.as_view()),
    
-    url(r'client/name/(?P<identifier>[\w]+)', views.getName, name='get_name'),
+    url(r'client/info/(?P<identifier>[\w]+)', views.getName, name='get_name'),
     url(r'client/request/(?P<identifier>[\w]+)', views.ClientRequest.as_view()),
 
     url(r'neutral/nowplaying/(?P<identifier>[\w]+)', views.NeutralPlaying.as_view()),

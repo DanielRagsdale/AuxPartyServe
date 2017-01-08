@@ -26,13 +26,15 @@ def getName(request, identifier):
     if session is None:
         return HttpResponse("{ \"does_exist\":false } ")
 
-    json = JSONRenderer().render({"does_exist":True, "user_name":session.user_name, "identifier":identifier })
+    json = JSONRenderer().render({"does_exist":True, "user_name":session.user_name, "service_name":session.service.name, "identifier":identifier })
 
     return HttpResponse(json) 
 
 class NeutralPlaying(APIView):
 
     def get(self, request, identifier):
+        identifier = identifier.upper()
+
         session = Session.objects.get(identifier=identifier)
         song = session.now_playing
 
