@@ -5,7 +5,7 @@ class SongSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Song
-        fields = ('title', 'apple_id')
+        fields = ('title', 'play_id')
 
 class ServiceSerializer(serializers.ModelSerializer):
 

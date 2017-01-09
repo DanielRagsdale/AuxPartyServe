@@ -6,9 +6,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.renderers import JSONRenderer
-from .models import Song, Session, SessionSong, SongRequest, SongCandidate
+from .models import Song, Session, SessionSong, SongRequest, SongCandidate, Service
 from .serializers import SessionSerializer, SessionSongSerializer, SessionNameSerializer
-from .tasks import gen_candidate_songs, create_request_from_apple 
+from .tasks import gen_candidate_songs, create_request_from_apple, create_request_from_spotify
 
 import operator
 import string
@@ -38,14 +38,14 @@ class NeutralPlaying(APIView):
         session = Session.objects.get(identifier=identifier)
         song = session.now_playing
 
-        return Response({"apple_id":song.apple_id, "is_closed":session.is_closed})
+        return Response({"play_id":song.play_id, "is_closed":session.is_closed})
 
     def post(self, request, identifier):
         identifier = identifier.upper()
 
         session = Session.objects.get(identifier=identifier)
 
-        now_playing = Song.objects.get(apple_id=request.data.get("apple_id"))
+        now_playing = Song.objects.get(play_id=request.data.get("play_id"))
         session.now_playing = now_playing
 
         session.save()
@@ -59,21 +59,32 @@ class ClientRequest(APIView):
 
     def post(self, request, identifier):
         identifier = identifier.upper()
+        
+        service_string = request.data.get('service')
 
-        apple_id = request.data.get('apple_id')
         session = Session.objects.get(identifier=identifier)
-        song = Song.objects.filter(apple_id=apple_id).first()
+        service = Service.objects.get(name=service_string)
 
         if session.is_closed:
             return Response("Session is Closed", status=status.HTTP_200_OK)
+        
+        play_id = request.data.get('play_id')
+        song = Song.objects.filter(service=service, play_id=play_id).first()
 
         if song is None:
-            # Add a song from an itunes lookup
-            create_request_from_apple.delay(apple_id, identifier)
-            print('song is not found')
+            if service_string == 'apple_music':
+                # Add a song from an itunes lookup
+                create_request_from_apple.delay(play_id, identifier)
+                print('song is not found')
 
-            return Response("delayed creation", status=status.HTTP_201_CREATED)
+                return Response("delayed apple creation", status=status.HTTP_201_CREATED)
         
+            elif service_string == 'spotify':
+                create_request_from_spotify.delay(play_id, identifier)
+                
+                print('song is not found')
+                return Response("delayed spotify creation", status=status.HTTP_201_CREATED)
+
         # Add a SongRequest object to later be considered by the AI
 
         song_request = SongRequest()
@@ -120,10 +131,14 @@ class SessionCreate(APIView):
     def post(self, request):
         # Create a session with user_name and unique identifier 
         user_name = request.data.get('user_name')
+        service_string = request.data.get('service')
+
+        service = Service.objects.get(name=service_string)
+        print(user_name)
         
         identifier = False
         while not identifier:
-            identifier =  tryCreateSession(user_name)
+            identifier =  tryCreateSession(user_name, service)
 
         return Response({
             'identifier': identifier,
@@ -168,13 +183,14 @@ def toKey(identifier):
 def generateID(size=5, chars=string.ascii_uppercase):
     return ''.join(random.choice(chars) for _ in range(size))
 
-def tryCreateSession(user_name):
+def tryCreateSession(user_name, service):
     identifier = generateID()
     
     try:
         sess = Session()
         sess.identifier = identifier 
         sess.user_name = user_name
+        sess.service = service
         sess.save()
     except IntegrityError:
         return False

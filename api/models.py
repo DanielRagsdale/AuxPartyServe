@@ -4,20 +4,22 @@ from django.db import models
 import datetime
 
 # Create your models here.
-class Song(models.Model):
-    title = models.CharField(max_length=250)
-    artist = models.CharField(max_length=250)
-
-    apple_id = models.CharField(max_length=250)
-
-    def __str__(self):
-        return self.title
-
 class Service(models.Model):
     name = models.CharField(max_length=15)
 
     def __str__(self):
         return self.name
+
+class Song(models.Model):
+    title = models.CharField(max_length=250)
+    artist = models.CharField(max_length=250)
+    
+    service = models.ForeignKey(Service, on_delete=models.PROTECT)
+
+    play_id = models.CharField(max_length=250)
+
+    def __str__(self):
+        return self.title
 
 class Session(models.Model):
     create_date = models.DateTimeField(auto_now_add=True) 

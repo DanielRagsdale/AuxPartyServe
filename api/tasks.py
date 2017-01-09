@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 from celery import Celery, shared_task
-from .models import Song, SongRequest, SongCandidate, Session
+from .models import Song, SongRequest, SongCandidate, Session, Service
 import requests
 
 @shared_task
@@ -24,7 +24,32 @@ def gen_candidate_songs(session_identifier):
         r.save()
 
     return True 
-   
+
+@shared_task
+def create_request_from_spotify(spotify_id, session_identifier):
+    r = requests.get('https://api.spotify.com/v1/tracks/' + spotify_id)
+
+    session = Session.objects.get(identifier=session_identifier)
+    service = Service.objects.get(name='spotify')
+
+    song = Song()
+
+    song.title = r.json().get('name')
+    song.artist = r.json().get('artists')[0].get('name')
+
+    song.play_id = spotify_id
+    song.service = service
+
+    song.save()
+
+    song_request = SongRequest()
+    song_request.session = session
+    song_request.song = song
+
+    song_request.save()
+
+    return 0
+
 @shared_task
 def create_request_from_apple(apple_id, session_identifier):
     r = requests.get('https://itunes.apple.com/lookup', params={'id':apple_id})
@@ -32,20 +57,20 @@ def create_request_from_apple(apple_id, session_identifier):
     print(r.json())
     
     session = Session.objects.get(identifier=session_identifier)
+    service = Service.objects.get(name='apple_music')
 
     song = Song()
 
     results = r.json().get('results')
     if len(results) > 0:
-        title = results[0].get('trackName')
-        artist = results[0].get('artistName')
+        song.title = results[0].get('trackName')
+        song.artist = results[0].get('artistName')
     else:
         print('Song not found!!: ' + str(apple_id))
         return 1
 
-    song.title = title
-    song.artist = artist
-    song.apple_id = apple_id
+    song.play_id = apple_id
+    song.service = service
 
     song.save()
 
